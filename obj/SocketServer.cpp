@@ -29,7 +29,7 @@ void http::SocketServer::Handle(sockaddr_in echoclient, int serversock, int clie
 			continue;
  		}
  		inet_ntoa(echoclient.sin_addr);
- 		Sockets.push_back(new Socket(clientsock));
+ 		Sockets.push_back(new HttpSocket(clientsock));
  }
 	std::cout << "Socket server stopped";
 }

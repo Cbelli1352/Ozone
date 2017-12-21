@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <iostream>
 #include <sstream>
+#include <fstream>
 
 #define MaxPending 5
 #define BufferSize 4096
@@ -25,11 +26,13 @@ namespace http {
 			std::string Path;
 		};
 	private:
-		http::HttpSocket::HttpHeaders ParseHttp(std::string request);
+		HttpHeaders ParseHttp(std::string request);
+
+		std::string GetFile(std::string path);
 
 		void HandleRequest();
 
-		std::thread * Helper;
+		std::thread Helper;
 
 		int Socket;
 	};

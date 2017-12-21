@@ -13,7 +13,7 @@ ODIR = obj
 IPRMS = $(INC:%=-I%)
 
 # Compile Flags
-CFLAGS=-I $(IDIR) -std=c++11 -lpthread
+CFLAGS=-I $(IDIR) -std=c++11 -lpthread -Wall
 
 # Linker Flags
 LFLAGS = -pthread
