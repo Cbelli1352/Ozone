@@ -2,47 +2,62 @@
 
 using namespace http;
 
+int HttpSocket::ThreadNum = 0;
+
 HttpSocket::HttpSocket(int socket) 
-	: Helper (&http::HttpSocket::HandleRequest, this) {
-	std::cout << "Request accepted" << std::endl;
+	: Helper (&http::HttpSocket::HandleRequest, this),
+	logger(Logger::GetLogger()) 
+{
+	logger.Log("Socket Started");
+	ThreadNum++;
 	Socket = socket;
 	Helper.detach();
 }
 
 void HttpSocket::HandleRequest() {
-	int recieved = -1;
-	while (recieved != 0) {
+	int recieved = 1;
+	while (recieved > 0) {
 		std::string buff;
 		size_t i = 0;
 		do {
 			buff.resize(BufferSize);
 			if ((recieved = recv(Socket, (char *) buff.data()+i*BufferSize, BufferSize, 0)) < 0) {
-				std::cout << "Connection reset by peer" << std::endl;
-				return;
+				logger.Log("Connection reset by peer. Id: " + (std::string) std::strerror(errno));
+				break;
 			}
 			++i;
 		} while (buff[buff.size()] != '\0');
-		if (recieved < 1) break;
+		if (recieved <= 1) break;
 		std::string request (buff.data(), BufferSize);
 
-		HttpHeaders headers = ParseHttp(request);
+		try {
+			logger.Log("Parsing Headers");
 
-		std::string response = GetFile(headers.Path);
+			HttpHeaders headers = ParseHttp(request);
+			
+			logger.Log("Getting file " + headers.Path);
 
-		int temp = send(Socket, response.data(), response.size(), 0);
+			std::string response = GetFile(headers.Path);
+
+			send(Socket, response.data(), response.size(), 0);
+		} catch (std::exception& e) {
+			logger.LogError("Invalid request");
+			close(Socket);
+			break;
+		}
 	}
-
-	std::cout << "Request finished" << std::endl;
+	ThreadNum--;
+	logger.Log("Request finished code " + std::to_string(ThreadNum));
 }
 
 std::string HttpSocket::GetFile (std::string path) {
 	if (path[path.size()-1] == '/') {
 		path += "index.html";
 	}
-	std::ifstream file("./html" + path);
+	std::ifstream file("." + path);
 
 	if (!file.is_open()) {
-		std::cout << "File not found" << std::endl;
+		logger.LogError("File " + path + " Not found");	
 		return "HTTP/1.1 404 Not Found\nContent-Type: text/plain\nContent-Length: 9\n\nNot Found";
 	}
 
@@ -59,12 +74,13 @@ std::string HttpSocket::GetFile (std::string path) {
 	size_t size = file.tellg();
 	std::string buffer(size, ' ');
 	file.seekg(0);
-	file.read(&buffer[0], size); 
+	file.read((char *) buffer.data(), size); 
 
 	std::string response = "HTTP/1.1 200 OK\n"
 							"Content-Type: text/"+ fileEnding+"\n"
 							"Content-Length: " + std::to_string(size) +
 							"\n\n" + buffer;
+	logger.Log("Responded with " + path);
 	return response;
 }
 
@@ -78,9 +94,8 @@ HttpSocket::HttpHeaders HttpSocket::ParseHttp(std::string request) {
 	std::getline(requestStream, line);
 
 	for (unsigned int i = 0; i < line.size(); ++i) {
-		if (line[i] != ' ') {
-			parsedHeaders.Method += line[i];
-		} else  {
+		if (line[i] == ' ') {
+			parsedHeaders.Method = line.substr(0, i);
 			line = line.substr(i+1, line.size());
 			break;
 		}
@@ -88,10 +103,12 @@ HttpSocket::HttpHeaders HttpSocket::ParseHttp(std::string request) {
 
 
 	for (unsigned int i = 0; i < line.size(); ++i) {
-		if (line[i] != ' ') {
-			parsedHeaders.Path += line[i];
-		} else break;
+		if (line[i] == ' ') {
+			parsedHeaders.Path = line.substr(0, i);
+		}
 	}
+
+	if (parsedHeaders.Path == "") throw std::exception();
 
 
 	while (std::getline(requestStream, line)) {
@@ -100,9 +117,8 @@ HttpSocket::HttpHeaders HttpSocket::ParseHttp(std::string request) {
 		std::string header, value;
 
 		for (unsigned int i = 0; i < line.size(); ++i) {
-			if (line[i] != ':') {
-				header += line[i];
-			} else {
+			if (line[i] == ':') {
+				header = line.substr(0, i);
 				value = line.substr(i+2, line.size());
 				break;
 			}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstring>
 #include <thread>
 #include <string>
 #include <map>
@@ -10,6 +11,8 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <Logger.h>
+#include<unistd.h>
 
 #define MaxPending 5
 #define BufferSize 4096
@@ -25,6 +28,7 @@ namespace http {
 			std::string Content;
 			std::string Path;
 		};
+		static int ThreadNum;
 	private:
 		HttpHeaders ParseHttp(std::string request);
 
@@ -33,6 +37,7 @@ namespace http {
 		void HandleRequest();
 
 		std::thread Helper;
+		Logger & logger;
 
 		int Socket;
 	};
